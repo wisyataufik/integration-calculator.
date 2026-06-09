@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Definite Integration Calculator</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f7fb;
+            color: #333;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        @media(min-width: 768px) {
+            .main-layout {
+                display: flex;
+                gap: 30px;
+            }
+            .sidebar {
+                flex: 1;
+                min-width: 300px;
+            }
+            .graph-area {
+                flex: 2;
+            }
+        }
+        h1 {
+            margin-top: 0;
+            font-size: 24px;
+            color: #1a1a1a;
+            border-bottom: 2px solid #eaeaea;
+            padding-bottom: 10px;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #555;
+            font-size: 14px;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: border 0.2s;
+        }
+        input:focus {
+            border-color: #0066cc;
+            outline: none;
+        }
+        .result-box {
+            background-color: #eef6ff;
+            border-left: 4px solid #0066cc;
+            padding: 15px;
+            border-radius: 0 6px 6px 0;
+            margin-top: 20px;
+        }
+        .result-title {
+            font-size: 14px;
+            color: #0055b3;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .result-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #111;
+        }
+        .error {
+            color: #cc0000;
+            font-size: 14px;
+            margin-top: 5px;
+            display: none;
+        }
+        canvas {
+            background: #ffffff;
+            border: 1px solid #e1e1e1;
+            border-radius: 8px;
+            max-height: 450px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Definite Integration Calculator</h1>
+    
+    <div class="main-layout">
+        <div class="sidebar">
+            <div class="input-group">
+                <label for="functionInput">Function f(x)</label>
+                <input type="text" id="functionInput" value="3 * x^2 - 2 * x + 1" placeholder="e.g., x^2, sin(x), exp(x)">
+                <div id="errorMsg" class="error">Invalid mathematical expression.</div>
+            </div>
+            
+            <div class="input-group">
+                <label for="lowerBound">Lower Limit (a)</label>
+                <input type="number" id="lowerBound" value="0" step="any">
+            </div>
+            
+            <div class="input-group">
+                <label for="upperBound">Upper Limit (b)</label>
+                <input type="number" id="upperBound" value="2" step="any">
+            </div>
+
+            <div class="input-group">
+                <label for="intervals">Subintervals (n) for Riemann Sum Approximation</label>
+                <input type="number" id="intervals" value="100" min="10" max="1000" step="1">
+            </div>
+
+            <div class="result-box">
+                <div class="result-title">Definite Integral Value</div>
+                <div class="result-value" id="integralResult">0.0000</div>
+            </div>
+        </div>
+
+        <div class="graph-area">
+            <canvas id="myChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<script>
+    let chart;
+    const ctx = document.getElementById('myChart').getContext('2d');
+
+    // DOM Elements
+    const functionInput = document.getElementById('functionInput');
+    const lowerBoundInput = document.getElementById('lowerBound');
+    const upperBoundInput = document.getElementById('upperBound');
+    const intervalsInput = document.getElementById('intervals');
+    const integralResult = document.getElementById('integralResult');
+    const errorMsg = document.getElementById('errorMsg');
+
+    // Helper to evaluate f(x) safely using math.js
+    function evaluateFunction(expr, xValue) {
+        try {
+            return math.evaluate(expr, { x: xValue });
+        } catch (e) {
+            return null;
+        }
+    }
+
+    // Main calculation and plotting logic
+    function updateCalculator() {
+        errorMsg.style.display = 'none';
+        const expr = functionInput.value;
+        const a = parseFloat(lowerBoundInput.value);
+        const b = parseFloat(upperBoundInput.value);
+        const n = parseInt(intervalsInput.value) || 100;
+
+        if (isNaN(a) || isNaN(b) || a >= b) {
+            integralResult.textContent = "N/A (Ensure a < b)";
+            return;
+        }
+
+        // 1. Calculate the Riemann Sum (Trapezoidal rule for better accuracy)
+        const dx = (b - a) / n;
+        let sum = 0.5 * (evaluateFunction(expr, a) + evaluateFunction(expr, b));
+        
+        if (sum === null || isNaN(sum)) {
+            errorMsg.style.display = 'block';
+            return;
+        }
+
+        for (let i = 1; i < n; i++) {
+            const y = evaluateFunction(expr, a + i * dx);
+            if (y === null || isNaN(y)) {
+                errorMsg.style.display = 'block';
+                return;
+            }
+            sum += y;
+        }
+        const area = sum * dx;
+        integralResult.textContent = area.toFixed(4);
+
+        // 2. Generate Data Points for Charting
+        // Determine window padding to see slightly beyond bounds [a, b]
+        const padding = (b - a) * 0.3 || 1; 
+        const graphStart = a - padding;
+        const graphEnd = b + padding;
+        const totalPoints = 150;
+        const step = (graphEnd - graphStart) / totalPoints;
+
+        const mainLineData = [];
+        const integralAreaData = [];
+
+        for (let i = 0; i <= totalPoints; i++) {
+            const currentX = graphStart + i * step;
+            const currentY = evaluateFunction(expr, currentX);
+            
+            if (currentY !== null && !isNaN(currentY)) {
+                mainLineData.push({ x: currentX, y: currentY });
+                
+                // If the coordinate falls within the integration bounds [a, b], map it for shaded area
+                if (currentX >= a && currentX <= b) {
+                    integralAreaData.push({ x: currentX, y: currentY });
+                }
+            }
+        }
+
+        // Close the shaded area path smoothly back to the x-axis
+        if (integralAreaData.length > 0) {
+            // Ensure bounds exactly line up at edges
+            integralAreaData.unshift({ x: a, y: evaluateFunction(expr, a) });
+            integralAreaData.push({ x: b, y: evaluateFunction(expr, b) });
+        }
+
+        // 3. Render or Update Chart
+        if (chart) {
+            chart.data.datasets[0].data = mainLineData;
+            chart.data.datasets[1].data = integralAreaData;
+            chart.update('none'); // Update without full layout animation for responsiveness
+        } else {
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: [
+                        {
+                            label: `f(x) = ${expr}`,
+                            data: mainLineData,
+                            borderColor: '#333333',
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: false,
+                            tension: 0.1
+                        },
+                        {
+                            label: 'Integrated Area',
+                            data: integralAreaData,
+                            borderColor: 'transparent',
+                            backgroundColor: 'rgba(0, 102, 204, 0.25)',
+                            fill: 'origin', // Shaded region down to x-axis (y=0)
+                            pointRadius: 0,
+                            tension: 0.1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            position: 'bottom',
+                            title: { display: true, text: 'x' }
+                        },
+                        y: {
+                            title: { display: true, text: 'y' }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+    }
+
+    // Event listeners to process variables live on input changes
+    [functionInput, lowerBoundInput, upperBoundInput, intervalsInput].forEach(element => {
+        element.addEventListener('input', updateCalculator);
+    });
+
+    // Run on initial load
+    updateCalculator();
+</script>
+
+</body>
+</html>
